@@ -29,6 +29,7 @@ st.session_state.setdefault("sched_mod",   0)
 st.session_state.setdefault("run_status",  "idle")
 st.session_state.setdefault("run_msg",     "")
 st.session_state.setdefault("lob",         "Business Auto")
+st.session_state.setdefault("confirm_run", False)
 
 LOB_NAV = [("Business Auto","🚗"),
     ("General Liability", "⚖️"),
@@ -651,24 +652,56 @@ if active_lob == "Business Auto":
             Nationwide Insurance &nbsp;&middot;&nbsp; BA Analytics Division<br>Internal Use Only
           </p></div>""", unsafe_allow_html=True)
 
+    # ── Confirmation dialog ─────────────────────────────────────────────────
+    @st.dialog("⚠️  Confirm Before Proceeding")
+    def confirm_dialog():
+        st.markdown("""
+        <div style="text-align:center;padding:12px 0 8px;">
+          <div style="font-size:48px;margin-bottom:8px;">📂</div>
+          <p style="font-size:15px;font-weight:600;color:#0C1A35;margin:0 0 10px;">
+            Please close all Excel files before continuing
+          </p>
+          <p style="font-size:12px;color:#6B7A9E;line-height:1.7;margin:0 0 6px;">
+            The rate-page builder needs exclusive access to the uploaded<br>
+            workbooks. If any file is still open in Excel, the process<br>
+            may fail or produce incomplete output.
+          </p>
+          <div style="background:#FFF7E6;border:1px solid #F5D060;border-radius:8px;
+                      padding:10px 16px;margin:14px 0 6px;text-align:left;">
+            <span style="font-size:12px;color:#8B6914;">
+              <strong>⚠ Tip:</strong> Save &amp; close every <code>.xlsx</code> / <code>.xlsm</code> file,
+              then click <strong>Proceed</strong>.
+            </span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        spacer(6)
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Cancel", use_container_width=True, type="secondary"):
+                st.rerun()
+        with c2:
+            if st.button("✅  Proceed", use_container_width=True, type="primary"):
+                # from BARatePages import run as run_rate_pages
+                # try:
+                #     run_rate_pages(
+                #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
+                #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
+                #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
+                #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
+                #         folder_selected=st.session_state.save_dir,
+                #         SchedRatingMod=int(st.session_state.sched_mod) or None,
+                #         CWRatebook=st.session_state["file_CW"],
+                #     )
+                #     st.session_state.run_status = "success"
+                # except Exception as e:
+                #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
+                st.session_state.run_status = "success"
+                st.rerun()
+
     if run:
-        st.warning("Ensure all Excel files are **saved and closed** before continuing.")
-        # from BARatePages import run as run_rate_pages
-        # try:
-        #     run_rate_pages(
-        #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
-        #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
-        #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
-        #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
-        #         folder_selected=st.session_state.save_dir,
-        #         SchedRatingMod=int(st.session_state.sched_mod) or None,
-        #         CWRatebook=st.session_state["file_CW"],
-        #     )
-        #     st.session_state.run_status = "success"
-        # except Exception as e:
-        #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
-        st.session_state.run_status = "success"
-        st.rerun()
+        confirm_dialog()
 
 
 # ─── OTHER LOBs ───────────────────────────────────────────────────────────────
