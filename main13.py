@@ -29,7 +29,7 @@ st.session_state.setdefault("sched_mod",   0)
 st.session_state.setdefault("run_status",  "idle")
 st.session_state.setdefault("run_msg",     "")
 st.session_state.setdefault("lob",         "Business Auto")
-st.session_state.setdefault("confirm_run", False)
+st.session_state.setdefault("confirm_step", "idle")
 
 LOB_NAV = [("Business Auto","🚗"),
     ("General Liability", "⚖️"),
@@ -629,19 +629,82 @@ if active_lob == "Business Auto":
             + '</div>', unsafe_allow_html=True)
 
         ready = has_files and save_ok
-        if ready:
-            st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
-            run = st.button("&#129413;  Create Rate Pages", key="run_btn", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            missing = []
-            if not has_files: missing.append("at least 1 ratebook")
-            if not save_ok:   missing.append("save location")
-            st.markdown('<div class="btn-wait">', unsafe_allow_html=True)
-            st.button(f"Waiting \u2014 {', '.join(missing)}", key="run_btn_dis",
-                      use_container_width=True, disabled=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            run = False
+
+        # ── Step: idle → show Create button or waiting ────────────────────
+        if st.session_state.confirm_step == "idle":
+            if ready:
+                st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
+                if st.button("&#129413;  Create Rate Pages", key="run_btn", use_container_width=True):
+                    st.session_state.confirm_step = "confirm"
+                    st.session_state.run_status = "idle"
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                missing = []
+                if not has_files: missing.append("at least 1 ratebook")
+                if not save_ok:   missing.append("save location")
+                st.markdown('<div class="btn-wait">', unsafe_allow_html=True)
+                st.button(f"Waiting \u2014 {', '.join(missing)}", key="run_btn_dis",
+                          use_container_width=True, disabled=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── Step: confirm → show warning card with Proceed / Cancel ───────
+        elif st.session_state.confirm_step == "confirm":
+            st.markdown("""
+            <div style="border:2px solid #F5D060;border-radius:12px;background:#FFFCF0;
+                        padding:24px 28px 18px;text-align:center;margin-bottom:10px;
+                        box-shadow:0 4px 20px rgba(200,169,81,0.15);">
+              <div style="font-size:40px;margin-bottom:6px;">⚠️</div>
+              <p style="font-size:15px;font-weight:700;color:#0C1A35;margin:0 0 8px;">
+                Close all Excel files before continuing
+              </p>
+              <p style="font-size:12px;color:#6B7A9E;line-height:1.7;margin:0 0 12px;">
+                The rate-page builder needs exclusive access to the workbooks.<br>
+                If any <code>.xlsx</code> / <code>.xlsm</code> file is still open, the
+                process may fail or produce incomplete output.
+              </p>
+              <div style="background:#FFF7E6;border:1px solid #EDD97A;border-radius:8px;
+                          padding:8px 14px;display:inline-block;margin-bottom:4px;">
+                <span style="font-size:11px;color:#8B6914;">
+                  💡 <strong>Save &amp; close every Excel file, then click Proceed.</strong>
+                </span>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            spacer(4)
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                if st.button("✖  Cancel", key="cancel_btn", use_container_width=True, type="secondary"):
+                    st.session_state.confirm_step = "idle"
+                    st.rerun()
+            with bc2:
+                st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
+                if st.button("✅  Proceed", key="proceed_btn", use_container_width=True, type="primary"):
+                    st.session_state.confirm_step = "processing"
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── Step: processing → run the backend ────────────────────────────
+        elif st.session_state.confirm_step == "processing":
+            with st.spinner("⏳  Creating rate pages… please wait."):
+                # from BARatePages import run as run_rate_pages
+                # try:
+                #     run_rate_pages(
+                #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
+                #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
+                #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
+                #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
+                #         folder_selected=st.session_state.save_dir,
+                #         SchedRatingMod=int(st.session_state.sched_mod) or None,
+                #         CWRatebook=st.session_state["file_CW"],
+                #     )
+                #     st.session_state.run_status = "success"
+                # except Exception as e:
+                #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
+                st.session_state.run_status = "success"
+            st.session_state.confirm_step = "idle"
+            st.rerun()
 
         if   st.session_state.run_status == "success": spacer(10); st.success("&#10003;  Rate pages created successfully.")
         elif st.session_state.run_status == "error":   spacer(10); st.error(st.session_state.run_msg)
@@ -651,63 +714,6 @@ if active_lob == "Business Auto":
           <p style="font-size:10px;color:#8892A4;letter-spacing:0.8px;text-transform:uppercase;text-align:center;margin:0;line-height:1.9;">
             Nationwide Insurance &nbsp;&middot;&nbsp; BA Analytics Division<br>Internal Use Only
           </p></div>""", unsafe_allow_html=True)
-
-    # ── Confirmation dialog ─────────────────────────────────────────────────
-    @st.dialog("⚠️  Confirm Before Proceeding")
-    def confirm_dialog():
-        st.markdown("""
-        <div style="text-align:center;padding:12px 0 8px;">
-          <div style="font-size:48px;margin-bottom:8px;">📂</div>
-          <p style="font-size:15px;font-weight:600;color:#0C1A35;margin:0 0 10px;">
-            Please close all Excel files before continuing
-          </p>
-          <p style="font-size:12px;color:#6B7A9E;line-height:1.7;margin:0 0 6px;">
-            The rate-page builder needs exclusive access to the uploaded<br>
-            workbooks. If any file is still open in Excel, the process<br>
-            may fail or produce incomplete output.
-          </p>
-          <div style="background:#FFF7E6;border:1px solid #F5D060;border-radius:8px;
-                      padding:10px 16px;margin:14px 0 6px;text-align:left;">
-            <span style="font-size:12px;color:#8B6914;">
-              <strong>⚠ Tip:</strong> Save &amp; close every <code>.xlsx</code> / <code>.xlsm</code> file,
-              then click <strong>Proceed</strong>.
-            </span>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        spacer(6)
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Cancel", use_container_width=True, type="secondary"):
-                st.rerun()
-        with c2:
-            if st.button("✅  Proceed", use_container_width=True, type="primary"):
-                st.session_state.confirm_run = True
-                st.rerun()
-
-    if run:
-        confirm_dialog()
-
-    # ── Run processing after dialog is dismissed ──────────────────────────
-    if st.session_state.confirm_run:
-        st.session_state.confirm_run = False
-        # from BARatePages import run as run_rate_pages
-        # try:
-        #     run_rate_pages(
-        #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
-        #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
-        #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
-        #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
-        #         folder_selected=st.session_state.save_dir,
-        #         SchedRatingMod=int(st.session_state.sched_mod) or None,
-        #         CWRatebook=st.session_state["file_CW"],
-        #     )
-        #     st.session_state.run_status = "success"
-        # except Exception as e:
-        #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
-        st.session_state.run_status = "success"
-        st.rerun()
 
 
 # ─── OTHER LOBs ───────────────────────────────────────────────────────────────
