@@ -683,25 +683,31 @@ if active_lob == "Business Auto":
                 st.rerun()
         with c2:
             if st.button("✅  Proceed", use_container_width=True, type="primary"):
-                # from BARatePages import run as run_rate_pages
-                # try:
-                #     run_rate_pages(
-                #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
-                #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
-                #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
-                #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
-                #         folder_selected=st.session_state.save_dir,
-                #         SchedRatingMod=int(st.session_state.sched_mod) or None,
-                #         CWRatebook=st.session_state["file_CW"],
-                #     )
-                #     st.session_state.run_status = "success"
-                # except Exception as e:
-                #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
-                st.session_state.run_status = "success"
+                st.session_state.confirm_run = True
                 st.rerun()
 
     if run:
         confirm_dialog()
+
+    # ── Run processing after dialog is dismissed ──────────────────────────
+    if st.session_state.confirm_run:
+        st.session_state.confirm_run = False
+        # from BARatePages import run as run_rate_pages
+        # try:
+        #     run_rate_pages(
+        #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
+        #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
+        #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
+        #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
+        #         folder_selected=st.session_state.save_dir,
+        #         SchedRatingMod=int(st.session_state.sched_mod) or None,
+        #         CWRatebook=st.session_state["file_CW"],
+        #     )
+        #     st.session_state.run_status = "success"
+        # except Exception as e:
+        #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
+        st.session_state.run_status = "success"
+        st.rerun()
 
 
 # ─── OTHER LOBs ───────────────────────────────────────────────────────────────
