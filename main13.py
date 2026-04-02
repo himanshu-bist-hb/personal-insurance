@@ -41,6 +41,7 @@ LOB_OPTIONS = [f"{ic}  {nm}" for nm, ic in LOB_NAV]
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def n_req():   return sum(1 for k in REQUIRED if st.session_state[f"file_{k}"])
 def all_req(): return n_req() == len(REQUIRED)
+def any_req(): return n_req() > 0
 
 def chip(f):
     if f:
@@ -512,7 +513,7 @@ with h2:
         fg = "#196B38" if nr == tot else "#1A5DAB"
         st.markdown(f"""
         <div style="text-align:right;padding-top:4px;">
-          <div style="font-size:10px;color:#6B7A9E;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;">Required Files</div>
+          <div style="font-size:10px;color:#6B7A9E;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;">Uploaded Files</div>
           <div style="font-size:28px;font-weight:700;color:{fg};line-height:1;font-family:'Libre Baskerville',serif;">
             {nr}<span style="font-size:13px;font-weight:400;color:#6B7A9E;">/{tot}</span>
           </div>
@@ -532,7 +533,7 @@ if active_lob == "Business Auto":
     with L:
         st.markdown('<div class="sec-label">&#128194; &nbsp;Proposed Ratebooks</div>', unsafe_allow_html=True)
 
-        with st.expander(f"REQUIRED RATEBOOKS  \u00b7  {n_req()} of {len(REQUIRED)} loaded", expanded=True):
+        with st.expander(f"RATEBOOKS  \u00b7  {n_req()} of {len(REQUIRED)} uploaded", expanded=True):
             spacer(6)
             r1 = st.columns(4); r2 = st.columns(4)
             for idx, key in enumerate(REQUIRED):
@@ -609,9 +610,9 @@ if active_lob == "Business Auto":
         spacer(6)
         st.markdown('<div class="sec-label">&#128203; &nbsp;Readiness</div>', unsafe_allow_html=True)
 
-        req_ok = all_req(); save_ok = bool(st.session_state.save_dir)
+        has_files = any_req(); save_ok = bool(st.session_state.save_dir)
         nr_now = n_req();   sdv = st.session_state.save_dir; mv = st.session_state.sched_mod
-        req_sub  = f"All {len(REQUIRED)} ratebooks selected" if req_ok else f"{len(REQUIRED)-nr_now} file(s) still needed"
+        req_sub  = f"All {len(REQUIRED)} ratebooks uploaded" if all_req() else f"{nr_now} of {len(REQUIRED)} ratebooks uploaded"
         save_sub = (("…"+sdv[-36:]) if len(sdv)>38 else sdv) if save_ok else "Not yet selected"
 
         def rdy(ok, title, sub):
@@ -621,20 +622,20 @@ if active_lob == "Business Auto":
 
         st.markdown(
             '<div class="rdy-card">'
-            + rdy(req_ok,  f'Ratebooks &nbsp;<span style="font-size:10px;color:#6B7A9E;font-weight:400;">{nr_now}/{len(REQUIRED)}</span>', req_sub)
+            + rdy(has_files,  f'Ratebooks &nbsp;<span style="font-size:10px;color:#6B7A9E;font-weight:400;">{nr_now}/{len(REQUIRED)}</span>', req_sub)
             + rdy(save_ok, "Save location", save_sub)
             + rdy(True,    f'Schedule Mod &nbsp;<span style="font-size:10px;color:#6B7A9E;font-weight:400;">{mv}%</span>', "Rule 417 threshold")
             + '</div>', unsafe_allow_html=True)
 
-        ready = req_ok and save_ok
+        ready = has_files and save_ok
         if ready:
             st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
             run = st.button("&#129413;  Create Rate Pages", key="run_btn", use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             missing = []
-            if not req_ok:  missing.append(f"{len(REQUIRED)-nr_now} ratebook(s)")
-            if not save_ok: missing.append("save location")
+            if not has_files: missing.append("at least 1 ratebook")
+            if not save_ok:   missing.append("save location")
             st.markdown('<div class="btn-wait">', unsafe_allow_html=True)
             st.button(f"Waiting \u2014 {', '.join(missing)}", key="run_btn_dis",
                       use_container_width=True, disabled=True)
