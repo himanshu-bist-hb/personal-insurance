@@ -329,6 +329,40 @@ div.btn-wait  > div > button { background:var(--border) !important; color:var(--
 [data-testid="stAlert"] { border-radius:8px !important; font-size:12px !important; }
 [data-testid="column"]  { padding:0 6px !important; }
 
+/* ── modal overlay ── */
+.modal-overlay {
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  background:rgba(12,26,53,0.55); backdrop-filter:blur(6px);
+  z-index:99999; display:flex; align-items:center; justify-content:center;
+}
+.modal-card {
+  background:#FFFCF0; border:2px solid #F5D060; border-radius:16px;
+  padding:36px 40px 28px; text-align:center; max-width:460px; width:90%;
+  box-shadow:0 12px 48px rgba(200,169,81,0.25), 0 0 0 1px rgba(255,252,240,0.4);
+}
+.modal-card .modal-icon  { font-size:48px; margin-bottom:10px; }
+.modal-card .modal-title { font-size:16px; font-weight:700; color:#0C1A35; margin:0 0 10px; }
+.modal-card .modal-body  { font-size:12px; color:#6B7A9E; line-height:1.7; margin:0 0 16px; }
+.modal-card .modal-hint  { background:#FFF7E6; border:1px solid #EDD97A; border-radius:8px;
+                           padding:10px 16px; display:inline-block; margin-bottom:8px; }
+.modal-card .modal-hint span { font-size:11px; color:#8B6914; }
+
+/* ── loading overlay ── */
+.loading-overlay {
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  background:rgba(12,26,53,0.60); backdrop-filter:blur(8px);
+  z-index:99999; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:24px;
+}
+.spinner-ring {
+  width:56px; height:56px; border:5px solid rgba(26,93,171,0.15);
+  border-top:5px solid #1A5DAB; border-radius:50%;
+  animation: spin 0.85s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family:'Inter',sans-serif; font-size:14px; font-weight:600; color:#fff; letter-spacing:0.5px; }
+.loading-sub  { font-family:'Inter',sans-serif; font-size:11px; color:rgba(255,255,255,0.6); margin-top:-16px; }
+
 /* ── coming soon ── */
 .coming-soon { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 32px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); text-align:center; margin-top:24px; }
 .coming-soon .cs-icon  { font-size:52px; margin-bottom:16px; }
@@ -547,7 +581,8 @@ if active_lob == "Business Auto":
 
         spacer(10)
         n_cw = bool(st.session_state["file_CW"])
-        with st.expander(f"OPTIONAL  \u00b7  CW RATEBOOK  {'— Loaded \u2713' if n_cw else '— Not loaded'}", expanded=True):
+        _cw_label = "— Loaded \u2713" if n_cw else "— Not loaded"
+        with st.expander(f"OPTIONAL  \u00b7  CW RATEBOOK  {_cw_label}", expanded=True):
             spacer(6)
             cw_c, _, _ = st.columns([1,1,1])
             with cw_c:
@@ -648,61 +683,71 @@ if active_lob == "Business Auto":
                           use_container_width=True, disabled=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── Step: confirm → show warning card with Proceed / Cancel ───────
+        # ── Step: confirm → open @st.dialog modal ────────────────────────
         elif st.session_state.confirm_step == "confirm":
+            @st.dialog("⚠️  Close & Save Excel Files")
+            def _confirm_dialog():
+                st.markdown("""
+                <div style="text-align:center;padding:8px 0 4px;">
+                  <div style="font-size:44px;margin-bottom:8px;">⚠️</div>
+                  <p style="font-size:15px;font-weight:700;color:#0C1A35;margin:0 0 10px;">
+                    Close all Excel files before continuing
+                  </p>
+                  <p style="font-size:12px;color:#6B7A9E;line-height:1.7;margin:0 0 14px;">
+                    The rate-page builder needs exclusive access to the workbooks.<br>
+                    If any <code>.xlsx</code> / <code>.xlsm</code> file is still open, the
+                    process may fail or produce incomplete output.
+                  </p>
+                  <div style="background:#FFF7E6;border:1px solid #EDD97A;border-radius:8px;
+                              padding:10px 16px;display:inline-block;">
+                    <span style="font-size:11px;color:#8B6914;">
+                      💡 <strong>Save &amp; close every Excel file, then click Proceed.</strong>
+                    </span>
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                spacer(12)
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("✖  Cancel", key="dlg_cancel", use_container_width=True, type="secondary"):
+                        st.session_state.confirm_step = "idle"
+                        st.rerun()
+                with dc2:
+                    st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
+                    if st.button("✅  Proceed", key="dlg_proceed", use_container_width=True, type="primary"):
+                        st.session_state.confirm_step = "processing"
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            _confirm_dialog()
+
+        # ── Step: processing → loading overlay with spinner ────────────────
+        elif st.session_state.confirm_step == "processing":
+            # Full-screen loading overlay with animated spinner ring
             st.markdown("""
-            <div style="border:2px solid #F5D060;border-radius:12px;background:#FFFCF0;
-                        padding:24px 28px 18px;text-align:center;margin-bottom:10px;
-                        box-shadow:0 4px 20px rgba(200,169,81,0.15);">
-              <div style="font-size:40px;margin-bottom:6px;">⚠️</div>
-              <p style="font-size:15px;font-weight:700;color:#0C1A35;margin:0 0 8px;">
-                Close all Excel files before continuing
-              </p>
-              <p style="font-size:12px;color:#6B7A9E;line-height:1.7;margin:0 0 12px;">
-                The rate-page builder needs exclusive access to the workbooks.<br>
-                If any <code>.xlsx</code> / <code>.xlsm</code> file is still open, the
-                process may fail or produce incomplete output.
-              </p>
-              <div style="background:#FFF7E6;border:1px solid #EDD97A;border-radius:8px;
-                          padding:8px 14px;display:inline-block;margin-bottom:4px;">
-                <span style="font-size:11px;color:#8B6914;">
-                  💡 <strong>Save &amp; close every Excel file, then click Proceed.</strong>
-                </span>
-              </div>
+            <div class="loading-overlay" id="loadingOverlay">
+              <div class="spinner-ring"></div>
+              <p class="loading-text">Creating rate pages…</p>
+              <p class="loading-sub">Please wait while the workbooks are processed.</p>
             </div>
             """, unsafe_allow_html=True)
 
-            spacer(4)
-            bc1, bc2 = st.columns(2)
-            with bc1:
-                if st.button("✖  Cancel", key="cancel_btn", use_container_width=True, type="secondary"):
-                    st.session_state.confirm_step = "idle"
-                    st.rerun()
-            with bc2:
-                st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
-                if st.button("✅  Proceed", key="proceed_btn", use_container_width=True, type="primary"):
-                    st.session_state.confirm_step = "processing"
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-
-        # ── Step: processing → run the backend ────────────────────────────
-        elif st.session_state.confirm_step == "processing":
-            with st.spinner("⏳  Creating rate pages… please wait."):
-                # from BARatePages import run as run_rate_pages
-                # try:
-                #     run_rate_pages(
-                #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
-                #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
-                #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
-                #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
-                #         folder_selected=st.session_state.save_dir,
-                #         SchedRatingMod=int(st.session_state.sched_mod) or None,
-                #         CWRatebook=st.session_state["file_CW"],
-                #     )
-                #     st.session_state.run_status = "success"
-                # except Exception as e:
-                #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
-                st.session_state.run_status = "success"
+            # from BARatePages import run as run_rate_pages
+            # try:
+            #     run_rate_pages(
+            #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
+            #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
+            #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
+            #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
+            #         folder_selected=st.session_state.save_dir,
+            #         SchedRatingMod=int(st.session_state.sched_mod) or None,
+            #         CWRatebook=st.session_state["file_CW"],
+            #     )
+            #     st.session_state.run_status = "success"
+            # except Exception as e:
+            #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
+            st.session_state.run_status = "success"
             st.session_state.confirm_step = "idle"
             st.rerun()
 
