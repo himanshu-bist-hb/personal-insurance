@@ -43,6 +43,7 @@ LOB_OPTIONS = [f"{ic}  {nm}" for nm, ic in LOB_NAV]
 def n_req():   return sum(1 for k in REQUIRED if st.session_state[f"file_{k}"])
 def all_req(): return n_req() == len(REQUIRED)
 def any_req(): return n_req() > 0
+def has_ngic(): return bool(st.session_state["file_NGIC"])
 
 def chip(f):
     if f:
@@ -329,39 +330,28 @@ div.btn-wait  > div > button { background:var(--border) !important; color:var(--
 [data-testid="stAlert"] { border-radius:8px !important; font-size:12px !important; }
 [data-testid="column"]  { padding:0 6px !important; }
 
-/* ── modal overlay ── */
-.modal-overlay {
-  position:fixed; top:0; left:0; width:100vw; height:100vh;
-  background:rgba(12,26,53,0.55); backdrop-filter:blur(6px);
-  z-index:99999; display:flex; align-items:center; justify-content:center;
+/* ── inline warning box ── */
+.warn-box {
+  border:1.5px solid #EDD97A; border-radius:10px; background:#FFFDF5;
+  padding:16px 20px; margin-top:12px;
+  box-shadow:0 2px 10px rgba(200,169,81,0.10);
 }
-.modal-card {
-  background:#FFFCF0; border:2px solid #F5D060; border-radius:16px;
-  padding:36px 40px 28px; text-align:center; max-width:460px; width:90%;
-  box-shadow:0 12px 48px rgba(200,169,81,0.25), 0 0 0 1px rgba(255,252,240,0.4);
-}
-.modal-card .modal-icon  { font-size:48px; margin-bottom:10px; }
-.modal-card .modal-title { font-size:16px; font-weight:700; color:#0C1A35; margin:0 0 10px; }
-.modal-card .modal-body  { font-size:12px; color:#6B7A9E; line-height:1.7; margin:0 0 16px; }
-.modal-card .modal-hint  { background:#FFF7E6; border:1px solid #EDD97A; border-radius:8px;
-                           padding:10px 16px; display:inline-block; margin-bottom:8px; }
-.modal-card .modal-hint span { font-size:11px; color:#8B6914; }
+.warn-box .wb-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.warn-box .wb-icon { font-size:18px; }
+.warn-box .wb-title { font-size:13px; font-weight:700; color:#0C1A35; }
+.warn-box .wb-body { font-size:11px; color:#6B7A9E; line-height:1.6; margin:0 0 4px; }
 
-/* ── loading overlay ── */
-.loading-overlay {
-  position:fixed; top:0; left:0; width:100vw; height:100vh;
-  background:rgba(12,26,53,0.60); backdrop-filter:blur(8px);
-  z-index:99999; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; gap:24px;
-}
-.spinner-ring {
-  width:56px; height:56px; border:5px solid rgba(26,93,171,0.15);
-  border-top:5px solid #1A5DAB; border-radius:50%;
-  animation: spin 0.85s linear infinite;
+/* ── inline spinner ── */
+.inline-loader { display:flex; align-items:center; gap:14px; padding:18px 20px; margin-top:12px;
+  border:1.5px solid var(--border); border-radius:10px; background:var(--surface); }
+.spin-ring {
+  width:28px; height:28px; border:3px solid rgba(26,93,171,0.15);
+  border-top:3px solid #1A5DAB; border-radius:50%; flex-shrink:0;
+  animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.loading-text { font-family:'Inter',sans-serif; font-size:14px; font-weight:600; color:#fff; letter-spacing:0.5px; }
-.loading-sub  { font-family:'Inter',sans-serif; font-size:11px; color:rgba(255,255,255,0.6); margin-top:-16px; }
+.loader-label { font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--nw-blue); }
+.loader-sub   { font-family:'Inter',sans-serif; font-size:10px; color:var(--muted); margin-top:2px; }
 
 /* ── coming soon ── */
 .coming-soon { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 32px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); text-align:center; margin-top:24px; }
@@ -656,14 +646,19 @@ if active_lob == "Business Auto":
             i = "&#10003;" if ok else "&#9675;"
             return f'<div class="rdy-row"><div class="rdy-dot {d}">{i}</div><div><div class="rdy-title">{title}</div><div class="rdy-sub">{sub}</div></div></div>'
 
+        ngic_uploaded = has_ngic()
+        ngic_sub = "Uploaded" if ngic_uploaded else "Required — please upload NGIC"
+
         st.markdown(
             '<div class="rdy-card">'
-            + rdy(has_files,  f'Ratebooks &nbsp;<span style="font-size:10px;color:#6B7A9E;font-weight:400;">{nr_now}/{len(REQUIRED)}</span>', req_sub)
+            + rdy(ngic_uploaded, 'NGIC Ratebook <span style="font-size:10px;color:#C8102E;font-weight:600;">REQUIRED</span>', ngic_sub)
+            + rdy(has_files,  f'Other Ratebooks &nbsp;<span style="font-size:10px;color:#6B7A9E;font-weight:400;">{nr_now}/{len(REQUIRED)}</span>', req_sub)
             + rdy(save_ok, "Save location", save_sub)
             + rdy(True,    f'Schedule Mod &nbsp;<span style="font-size:10px;color:#6B7A9E;font-weight:400;">{mv}%</span>', "Rule 417 threshold")
             + '</div>', unsafe_allow_html=True)
 
-        ready = has_files and save_ok
+        ngic_ok = has_ngic()
+        ready = ngic_ok and save_ok
 
         # ── Step: idle → show Create button or waiting ────────────────────
         if st.session_state.confirm_step == "idle":
@@ -676,78 +671,84 @@ if active_lob == "Business Auto":
                 st.markdown('</div>', unsafe_allow_html=True)
             else:
                 missing = []
-                if not has_files: missing.append("at least 1 ratebook")
+                if not ngic_ok:   missing.append("NGIC ratebook")
                 if not save_ok:   missing.append("save location")
                 st.markdown('<div class="btn-wait">', unsafe_allow_html=True)
                 st.button(f"Waiting \u2014 {', '.join(missing)}", key="run_btn_dis",
                           use_container_width=True, disabled=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── Step: confirm → open @st.dialog modal ────────────────────────
+        # ── Step: confirm → inline warning box below button ─────────────
         elif st.session_state.confirm_step == "confirm":
-            @st.dialog("⚠️  Close & Save Excel Files")
-            def _confirm_dialog():
-                st.markdown("""
-                <div style="text-align:center;padding:8px 0 4px;">
-                  <div style="font-size:44px;margin-bottom:8px;">⚠️</div>
-                  <p style="font-size:15px;font-weight:700;color:#0C1A35;margin:0 0 10px;">
-                    Close all Excel files before continuing
-                  </p>
-                  <p style="font-size:12px;color:#6B7A9E;line-height:1.7;margin:0 0 14px;">
-                    The rate-page builder needs exclusive access to the workbooks.<br>
-                    If any <code>.xlsx</code> / <code>.xlsm</code> file is still open, the
-                    process may fail or produce incomplete output.
-                  </p>
-                  <div style="background:#FFF7E6;border:1px solid #EDD97A;border-radius:8px;
-                              padding:10px 16px;display:inline-block;">
-                    <span style="font-size:11px;color:#8B6914;">
-                      💡 <strong>Save &amp; close every Excel file, then click Proceed.</strong>
-                    </span>
+            st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
+            st.button("&#129413;  Create Rate Pages", key="run_btn_cfm", use_container_width=True, disabled=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="warn-box">
+              <div class="wb-head">
+                <span class="wb-icon">⚠️</span>
+                <span class="wb-title">Close &amp; save all open Excel files</span>
+              </div>
+              <p class="wb-body">
+                The builder needs exclusive access to the workbooks.
+                Please save and close any open <code>.xlsx</code> / <code>.xlsm</code> files before proceeding.
+              </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            spacer(8)
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                if st.button("Cancel", key="cancel_btn", use_container_width=True, type="secondary"):
+                    st.session_state.confirm_step = "idle"
+                    st.rerun()
+            with bc2:
+                if st.button("Proceed", key="proceed_btn", use_container_width=True, type="primary"):
+                    st.session_state.confirm_step = "processing"
+                    st.rerun()
+
+        # ── Step: processing → inline spinner below button ─────────────────
+        elif st.session_state.confirm_step == "processing":
+            st.markdown('<div class="btn-wait">', unsafe_allow_html=True)
+            st.button("Processing…", key="run_btn_proc", use_container_width=True, disabled=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            loader_placeholder = st.empty()
+
+            def update_progress(msg: str):
+                loader_placeholder.markdown(f"""
+                <div class="inline-loader">
+                  <div class="spin-ring"></div>
+                  <div>
+                    <div class="loader-label">Creating rate pages…</div>
+                    <div class="loader-sub">{msg}</div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                spacer(12)
-                dc1, dc2 = st.columns(2)
-                with dc1:
-                    if st.button("✖  Cancel", key="dlg_cancel", use_container_width=True, type="secondary"):
-                        st.session_state.confirm_step = "idle"
-                        st.rerun()
-                with dc2:
-                    st.markdown('<div class="btn-ready">', unsafe_allow_html=True)
-                    if st.button("✅  Proceed", key="dlg_proceed", use_container_width=True, type="primary"):
-                        st.session_state.confirm_step = "processing"
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+            # Initial message
+            update_progress("Please wait while the workbooks are processed.")
 
-            _confirm_dialog()
+            from BARatePages import run as run_rate_pages
+            try:
+                run_rate_pages(
+                    NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
+                    NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
+                    NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
+                    CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
+                    folder_selected=st.session_state.save_dir,
+                    SchedRatingMod=int(st.session_state.sched_mod) or None,
+                    CWRatebook=st.session_state["file_CW"],
+                    progress_callback=update_progress,
+                )
+                st.session_state.run_status = "success"
+            except Exception as e:
+                import traceback
+                traceback.print_exc()  # Also log it out for easier debugging
+                st.session_state.run_status = "error"
+                st.session_state.run_msg = str(e)
 
-        # ── Step: processing → loading overlay with spinner ────────────────
-        elif st.session_state.confirm_step == "processing":
-            # Full-screen loading overlay with animated spinner ring
-            st.markdown("""
-            <div class="loading-overlay" id="loadingOverlay">
-              <div class="spinner-ring"></div>
-              <p class="loading-text">Creating rate pages…</p>
-              <p class="loading-sub">Please wait while the workbooks are processed.</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # from BARatePages import run as run_rate_pages
-            # try:
-            #     run_rate_pages(
-            #         NGICRatebook=st.session_state["file_NGIC"], MMRatebook=st.session_state["file_MM"],
-            #         NACORatebook=st.session_state["file_NACO"], NICOFRatebook=st.session_state["file_NICOF"],
-            #         NAFFRatebook=st.session_state["file_NAFF"], HICNJRatebook=st.session_state["file_HICNJ"],
-            #         CCMICRatebook=st.session_state["file_CCMIC"], NWAGRatebook=st.session_state["file_NWAG"],
-            #         folder_selected=st.session_state.save_dir,
-            #         SchedRatingMod=int(st.session_state.sched_mod) or None,
-            #         CWRatebook=st.session_state["file_CW"],
-            #     )
-            #     st.session_state.run_status = "success"
-            # except Exception as e:
-            #     st.session_state.run_status = "error"; st.session_state.run_msg = str(e)
-            st.session_state.run_status = "success"
             st.session_state.confirm_step = "idle"
             st.rerun()
 

@@ -28,7 +28,7 @@ import logging
 import warnings
 from collections import namedtuple
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -292,6 +292,7 @@ def process_ratebook(
 
 def load_all_ratebooks(
     rate_books: Dict[str, Union[pd.ExcelFile, str]],
+    progress_callback: Optional[Callable[[str], None]] = None,
 ) -> Dict[str, Optional[Dict]]:
     """
     Process all company ratebooks and return a nested dict of rate tables.
@@ -331,12 +332,15 @@ def load_all_ratebooks(
     rate_tables: Dict[str, Optional[Dict]] = {}
 
     for company, company_file in rate_books.items():
+        if progress_callback:
+            progress_callback(f"Loading {company} ratebook...")
+            
         key, tables = process_ratebook(company, company_file)
         rate_tables[key] = tables
         status = f"{len(tables)} tables" if tables else "skipped"
         logger.info("Company '%s': %s", key, status)
         print(f"  Loaded {key}: {status}")
-
+        
     return rate_tables
 
 
@@ -368,6 +372,7 @@ def run(
     folder_selected: str,
     SchedRatingMod:  Optional[int],
     CWRatebook:      Optional[str],
+    progress_callback: Optional[Callable[[str], None]] = None,
 ) -> None:
     """
     Orchestrate the full rate-page generation pipeline.
@@ -391,6 +396,7 @@ def run(
     """
     import time
     t_start = time.perf_counter()
+    if progress_callback: progress_callback("Initializing...")
     print("Creating Rate Pages")
 
     # Suppress noisy openpyxl style / deprecation warnings during processing
@@ -431,6 +437,7 @@ def run(
     cw_file = pd.ExcelFile(cw_path)
 
     # ── 4. Load NAICS descriptions ────────────────────────────────────────────
+    if progress_callback: progress_callback("Loading NAICS descriptions...")
     naics_descriptions = load_naics_descriptions()
 
     # ── 5. Assemble the rate_books dict & extract all tables ──────────────────
@@ -447,9 +454,10 @@ def run(
         "NWAG":  ratebooks["NWAGRatebook"],
     }
 
-    rate_tables = load_all_ratebooks(rate_books)
+    rate_tables = load_all_ratebooks(rate_books, progress_callback)
 
     # ── 6. Build the Excel output ─────────────────────────────────────────────
+    if progress_callback: progress_callback("Building Excel rate pages (this may take a moment)...")
     rate_pages_obj = BA.Auto(
         info.state_abb,
         info.state,
@@ -469,6 +477,7 @@ def run(
     print("Stage 1: Excel Build File Complete")
 
     # ── 7. Determine file names and save ──────────────────────────────────────
+    if progress_callback: progress_callback("Saving Excel file...")
     market    = "BA Middle Market Rate Pages" if MMRatebook else "BA Small Market Rate Pages"
     out_dir   = Path(folder_selected)
     file_stem = f"{info.state_abb} {info.n_effective} {market}"
@@ -480,7 +489,9 @@ def run(
     print("Stage 2: Excel file saved.")
 
     # ── 8. Generate PDF ───────────────────────────────────────────────────────
+    if progress_callback: progress_callback("Generating PDF document...")
     process_pagebreaks(xlsx_out, pdf_out)
 
     elapsed = time.perf_counter() - t_start
+    if progress_callback: progress_callback(f"Successfully completed in {elapsed:0.1f} seconds! 🎉")
     print(f"This program ran in {elapsed:0.4f} seconds")
